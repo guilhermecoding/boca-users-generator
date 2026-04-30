@@ -1,4 +1,4 @@
-# 🚀 Gerador de Usuários para BOCA
+# 🚀 Gerador de Usuários para o BOCA
 
 Script em Python para criação automatizada de usuários em lote para o sistema BOCA, gerando:
 
