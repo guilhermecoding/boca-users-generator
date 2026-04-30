@@ -2,7 +2,7 @@ import string
 import secrets
 import sys
 import os
-import csv
+from openpyxl import Workbook
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -39,7 +39,6 @@ def check_boca_configs():
 
     return site_number, user_type, multi_login, enabled, change_pass
 
-
 def check_env_vars():
     """Verifica e retorna todas as variáveis de ambiente de arquivo/geração com fallbacks."""
     try:
@@ -52,20 +51,24 @@ def check_env_vars():
     input_f = os.getenv("INPUT_FILE", "times")
     out_dir = os.getenv("OUTPUT_DIR", "output")
     out_txt = os.getenv("OUTPUT_TXT", "boca_config")
-    out_csv_cred = os.getenv("OUTPUT_CSV_CREDENTIALS", "credenciais")
-    out_csv_pres = os.getenv("OUTPUT_CSV_ATTENDANCE", "lista_presenca")
-    user_class = os.getenv("USER_CLASS", "Geral") # Nova variável com fallback
+    
+    # Atualizado para buscar variáveis de Excel (XLSX)
+    out_excel_cred = os.getenv("OUTPUT_EXCEL_CREDENTIALS", "credenciais")
+    out_excel_pres = os.getenv("OUTPUT_EXCEL_ATTENDANCE", "lista_presenca")
+    user_class = os.getenv("USER_CLASS", "Geral")
 
     if not input_f.endswith(('.txt', '.csv')):
         input_f += '.txt'
     if not out_txt.endswith('.txt'):
         out_txt += '.txt'
-    if not out_csv_cred.endswith('.csv'):
-        out_csv_cred += '.csv'
-    if not out_csv_pres.endswith('.csv'):
-        out_csv_pres += '.csv'
+    
+    # Correção de extensão para XLSX
+    if not out_excel_cred.endswith('.xlsx'):
+        out_excel_cred += '.xlsx'
+    if not out_excel_pres.endswith('.xlsx'):
+        out_excel_pres += '.xlsx'
 
-    return tamanho, inicio, input_f, out_dir, out_txt, out_csv_cred, out_csv_pres, user_class
+    return tamanho, inicio, input_f, out_dir, out_txt, out_excel_cred, out_excel_pres, user_class
 
 def gerar_senha(tamanho):
     alfabeto = string.ascii_lowercase + string.digits
@@ -73,12 +76,12 @@ def gerar_senha(tamanho):
 
 def main():
     # 1. Carrega e valida configurações GERAIS
-    tamanho_senha, user_index, in_file, out_dir, out_txt, out_csv_cred, out_csv_pres, user_class = check_env_vars()
+    tamanho_senha, user_index, in_file, out_dir, out_txt, out_excel_cred, out_excel_pres, user_class = check_env_vars()
 
     # 2. Carrega e valida configurações do BOCA
     boca_site, boca_type, boca_multilogin, boca_enabled, boca_changepass = check_boca_configs()
 
-    # 3. Valida arquivo de entrada ANTES de criar pastas/arquivos de saída
+    # 3. Valida arquivo de entrada
     if not os.path.exists(in_file):
         print(f"Erro: Arquivo de entrada '{in_file}' não encontrado.")
         sys.exit(1)
@@ -88,21 +91,25 @@ def main():
 
     # 5. Monta os caminhos completos
     caminho_txt = os.path.join(out_dir, out_txt)
-    caminho_csv_cred = os.path.join(out_dir, out_csv_cred)
-    caminho_csv_pres = os.path.join(out_dir, out_csv_pres)
+    caminho_excel_cred = os.path.join(out_dir, out_excel_cred)
+    caminho_excel_pres = os.path.join(out_dir, out_excel_pres)
+
+    # 6. Inicializa as planilhas do Excel na memória
+    wb_cred = Workbook()
+    ws_cred = wb_cred.active
+    ws_cred.title = "Credenciais"
+    ws_cred.append(['Nome', 'Usuario', 'Senha', 'Turma']) # Cabeçalho
+
+    wb_pres = Workbook()
+    ws_pres = wb_pres.active
+    ws_pres.title = "Lista de Presenca"
+    ws_pres.append(['Nome', 'Usuario', 'Turma', 'Presente']) # Cabeçalho
 
     try:
+        # Abre o arquivo de entrada e cria o de saída do BOCA (txt)
         with open(in_file, 'r', encoding='utf-8') as f_in, \
-             open(caminho_txt, 'w', encoding='utf-8') as f_txt, \
-             open(caminho_csv_cred, 'w', encoding='utf-8', newline='') as f_csv_cred, \
-             open(caminho_csv_pres, 'w', encoding='utf-8', newline='') as f_csv_pres:
+             open(caminho_txt, 'w', encoding='utf-8') as f_txt:
             
-            writer_cred = csv.writer(f_csv_cred)
-            writer_cred.writerow(['Nome', 'Usuario', 'Senha', 'Turma']) # Nova coluna adicionada
-
-            writer_pres = csv.writer(f_csv_pres)
-            writer_pres.writerow(['Nome', 'Usuario', 'Turma', 'Presente']) # Nova coluna adicionada
-
             # Cabeçalho global do BOCA
             f_txt.write("[user]\n")
             
@@ -112,7 +119,7 @@ def main():
                     continue
 
                 username = f"{boca_type}{user_index}"
-                fullname_formatado = f"{nome_original} ({username})" # Formato: Nome (teamxxx)
+                fullname_formatado = f"{nome_original} ({username})"
                 password = gerar_senha(tamanho_senha)
 
                 # Escrita no arquivo TXT
@@ -121,22 +128,26 @@ def main():
                 f_txt.write(f"username={username}\n")
                 f_txt.write(f"userpassword={password}\n")
                 f_txt.write(f"usertype={boca_type}\n")
-                f_txt.write(f"userfullname={fullname_formatado}\n") # Usando o nome formatado
+                f_txt.write(f"userfullname={fullname_formatado}\n")
                 f_txt.write(f"userdesc={boca_type.capitalize()} {user_index}\n")
                 f_txt.write(f"usermultilogin={boca_multilogin}\n")
                 f_txt.write(f"userenabled={boca_enabled}\n")
                 f_txt.write(f"userchangepassword={boca_changepass}\n\n")
 
-                # Escrita nos CSVs
-                writer_cred.writerow([fullname_formatado, username, password, user_class])
-                writer_pres.writerow([fullname_formatado, username, user_class, ""])
+                # Adiciona as linhas nas planilhas na memória
+                ws_cred.append([fullname_formatado, username, password, user_class])
+                ws_pres.append([fullname_formatado, username, user_class, ""])
 
                 user_index += 1
+
+        # 7. Salva as planilhas do Excel fisicamente na pasta de output
+        wb_cred.save(caminho_excel_cred)
+        wb_pres.save(caminho_excel_pres)
         
         print(f"Sucesso! Arquivos gerados na pasta '{out_dir}':")
         print(f"- {out_txt} (Config: Tipo '{boca_type}', Site '{boca_site}')")
-        print(f"- {out_csv_cred}")
-        print(f"- {out_csv_pres}")
+        print(f"- {out_excel_cred}")
+        print(f"- {out_excel_pres}")
 
     except Exception as e:
         print(f"Erro durante a gravação dos arquivos: {e}")
