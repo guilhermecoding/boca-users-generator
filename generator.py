@@ -75,7 +75,7 @@ def gerar_senha(tamanho):
     return "".join(secrets.choice(alfabeto) for _ in range(tamanho))
 
 def main():
-    print("\n\t[-] BOCA USERS GENERATOR - by João Guilherme\n\n\n")
+    print("\n\t[-] BOCA USERS GENERATOR - by João Guilherme\n\n")
     # 1. Carrega e valida configurações GERAIS
     tamanho_senha, user_index, in_file, out_dir, out_txt, out_excel_cred, out_excel_pres, user_class = check_env_vars()
 
