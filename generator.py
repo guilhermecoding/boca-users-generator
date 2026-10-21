@@ -115,7 +115,7 @@ def main():
             f_txt.write("[user]\n")
             
             for linha in f_in:
-                nome_original = linha.strip()
+                nome_original = " ".join(linha.split())
                 if not nome_original:
                     continue
 
